@@ -1,3 +1,4 @@
+# Clase para construir el comando de interlist
 class CommandBuilder:
   def __init__(self):
     self.reset()

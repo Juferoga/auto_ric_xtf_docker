@@ -1,43 +1,51 @@
+
 version: '3.3'
 
+# Proyecto interlis - arquitectura
+# name: interlis
+
+# Definicion de los servicios a crear
 services:
+
+  # Servicio base de datos geografica 
   postgis:
+    container_name: postgis
+    # Se usa la version 12-3 porque es la que soporta interlist de swisstierracolombia
     image: postgis/postgis:12-3.4-alpine
     environment:
+      # Definicion variables de entorno
+      # ! Cambiar por una mas segura
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: db
+    # se deja abierto el puerto para testeo (se puede comentar)
     ports:
       - 5432:5432
+    # en este espacio se alojara el contenido de la BD
+    # *** preguntar por estrategia de borrado ***
     volumes:
       - ./postgis_data:/var/lib/postgresql/data
 
-  schema_import:
+  # Servicio interlis, ejecutables swisstierracolombia
+  java_app:
+    container_name: java_app
     image: openjdk:11
+    # Se almacenan todos los ejecutables necesarios
     volumes:
       - ./jars/ili2pg-4.4.4/:/app/ili2pg-4.4.4/
       - ./jars/RIC/:/app/RIC/
-    command: "java -jar /app/ili2pg-4.4.4/ili2pg-4.4.4.jar --schemaimport --dbhost postgis --dbport 5432 --dbusr postgres --dbpwd admin --dbdatabase db --dbschema postgres --setupPgExt --coalesceCatalogueRef --createEnumTabs --createNumChecks --coalesceMultiSurface --coalesceMultiLine --coalesceMultiPoint --coalesceArray --beautifyEnumDispName --createUnique --createGeomIdx --createFk --createFkIdx --createMetaInfo --expandMultilingual --createTypeConstraint --createEnumTabsWithId --createTidCol --smart2Inheritance --strokeArcs --defaultSrsCode 9377 --preScript /app/RIC/5_RIC_dev/insert_ctm12_pg.sql --modeldir /app/RIC/ --models Modelo_Aplicacion_LADMCOL_RIC_V0_1"
+      - ./scripts/:/scripts/
+      - ./IGAC.xtf:/app/IGAC.xtf
+      - ./delete.xtf:/app/delete.xtf
+    # Se ejecuta el comando de migracion de la BD
+    command: >
+      sh -c "/scripts/wait-for-postgres.sh postgis java -jar /app/ili2pg-4.4.4/ili2pg-4.4.4.jar --schemaimport --dbhost postgis --dbport 5432 --dbusr postgres --dbpwd admin --dbdatabase db --dbschema postgres --setupPgExt --coalesceCatalogueRef --createEnumTabs --createNumChecks --coalesceMultiSurface --coalesceMultiLine --coalesceMultiPoint --coalesceArray --beautifyEnumDispName --createUnique --createGeomIdx --createFk --createFkIdx --createMetaInfo --expandMultilingual --createTypeConstraint --createEnumTabsWithId --createTidCol --smart2Inheritance --strokeArcs --defaultSrsCode 9377 --preScript /app/RIC/5_RIC_dev/insert_ctm12_pg.sql --modeldir /app/RIC/ --models Modelo_Aplicacion_LADMCOL_RIC_V0_1 && java -jar /app/ili2pg-4.4.4/ili2pg-4.4.4.jar --import --importTid --dbhost postgis --dbport 5432 --dbusr postgres --dbpwd admin --dbdatabase db --dbschema postgres --coalesceCatalogueRef --createEnumTabs --createNumChecks --coalesceMultiSurface --coalesceMultiLine --coalesceMultiPoint --coalesceArray --beautifyEnumDispName --createUnique --createGeomIdx --createFk --createFkIdx --createMetaInfo --expandMultilingual --createTypeConstraint --createEnumTabsWithId --createTidCol --smart2Inheritance --strokeArcs --defaultSrsCode 9377 --modeldir /app/RIC/ --models Modelo_Aplicacion_LADMCOL_RIC_V0_1 /app/IGAC.xtf"
+    # Depende de que se cree inicialmente postgis
     depends_on: 
       - postgis
 
-  # data_import:
-  #   image: openjdk:11
-  #   volumes:
-  #     - ./jars/ili2pg-4.4.4/:/app/
-  #     - ./IGAC.xtf:/app/IGAC.xtf
-  #   #command: "java -jar /app/ili2pg-4.4.4.jar --import --importTid --dbhost postgis --dbport 5432 --dbusr postgres --dbpwd admin --dbdatabase db --dbschema postgres --coalesceCatalogueRef --createEnumTabs --createNumChecks --coalesceMultiSurface --coalesceMultiLine --coalesceMultiPoint --coalesceArray --beautifyEnumDispName --createUnique --createGeomIdx --createFk --createFkIdx --createMetaInfo --expandMultilingual --createTypeConstraint --createEnumTabsWithId --createTidCol --smart2Inheritance --strokeArcs --defaultSrsCode 9377 --modeldir /app --models Modelo_Aplicacion_LADMCOL_RIC_V0_1 /app/IGAC_25372.xtf"
-  #   depends_on: 
-  #     - postgis
-
-  # data_export:
-  #   image: openjdk:11
-  #   volumes:
-  #     - ./jars/ili2pg-4.4.4/:/app/
-  #     - ./delete.xtf:/app/delete.xtf
-  #     - ./errores.txt:/app/errores.txt
-  #   #command: "java -jar /app/ili2pg-4.4.4.jar --dbhost postgis --dbport 5432 --dbusr postgres --dbpwd admin --dbdatabase db --dbschema postgres --export --exportTid --modeldir /app --models Modelo_Aplicacion_LADMCOL_RIC_V0_1 --log /app/errores.txt /app/delete.xtf"
-  #   depends_on: 
-  #     - postgis
+  
+  # // "java -jar /app/ili2pg-4.4.4/ili2pg-4.4.4.jar --import --importTid --dbhost postgis --dbport 5432 --dbusr postgres --dbpwd admin --dbdatabase db --dbschema postgres --coalesceCatalogueRef --createEnumTabs --createNumChecks --coalesceMultiSurface --coalesceMultiLine --coalesceMultiPoint --coalesceArray --beautifyEnumDispName --createUnique --createGeomIdx --createFk --createFkIdx --createMetaInfo --expandMultilingual --createTypeConstraint --createEnumTabsWithId --createTidCol --smart2Inheritance --strokeArcs --defaultSrsCode 9377 --modeldir /app/RIC/ --models Modelo_Aplicacion_LADMCOL_RIC_V0_1 /app/IGAC.xtf"
+  # // "java -jar /app/ili2pg-4.4.4/ili2pg-4.4.4.jar --dbhost postgis --dbport 5432 --dbusr postgres --dbpwd admin --dbdatabase db --dbschema postgres --export --exportTid --modeldir /app/RIC/ --models Modelo_Aplicacion_LADMCOL_RIC_V0_1 --log /app/errores.txt /app/delete.xtf"
 
 
